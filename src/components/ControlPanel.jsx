@@ -40,7 +40,7 @@ const ControlPanel = ({ windSpeed, setWindSpeed, variance, setVariance, windHead
               <span>Wind Heading</span>
               <span>{windHeading}&deg;</span>
             </div>
-            <input className="slider" type="range" min="0" max="360" step="1" value={windHeading} onChange={(e) => setWindHeading(parseInt(e.target.value))} />
+            <input className="slider" type="range" min="-180" max="180" step="1" value={windHeading} onChange={(e) => setWindHeading(parseInt(e.target.value))} />
           </div>
         </>
       )}

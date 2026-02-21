@@ -15,9 +15,7 @@ const getColor = (drift, expectedSpread) => {
 };
 
 export const createParticle = (lng = -79.3948, lat = 43.6532) => {
-  // Random lifetime: 6 hours to 2 days (6–48 sim-hours)
-  const lifetimeHours = 6 + Math.random() * 42;
-  // At 60fps, 1 frame = 1 sim-minute, so 1 sim-hour = 60 frames
+  const lifetimeHours = 4 + Math.random() * 32;
   const lifetimeFrames = lifetimeHours * 60;
   return {
     id: Math.random(),
