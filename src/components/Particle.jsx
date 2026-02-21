@@ -16,21 +16,32 @@ export const createParticle = (lng = -79.3948, lat = 43.6532) => ({
 // timeScale factor: minutes simulated per real second
 const TIME_SCALE = 60;
 
+// Random uniform distribution between -range and range
+const randomUniform = (range) => (Math.random() - 0.5) * 2 * range;
+
 export const updateParticles = (prev, windSpeed, variance, fires = [], windHeading = 0, timeScale = TIME_SCALE) => {
+  // Convert wind heading and speed to u,v components (Navier-Stokes)
   const headingRad = (windHeading * Math.PI) / 180;
-  const vLng = Math.cos(headingRad) * windSpeed * timeScale;
-  const vLat = Math.sin(headingRad) * windSpeed * timeScale;
-  const varStep = variance * timeScale;
+  const dt = timeScale; // time step scaling
+  
+  // Wind velocity components (wind_u, wind_v)
+  const wind_u = Math.cos(headingRad) * windSpeed * dt;
+  const wind_v = Math.sin(headingRad) * windSpeed * dt;
+  
+  // Diffusion/turbulence variance
+  const varStep = variance * dt;
 
   const next = [];
   for (let i = 0; i < prev.length; i++) {
     const p = prev[i];
     const newLife = p.life - 0.005;
     if (newLife > 0) {
+      // Navier-Stokes particle update:
+      // position += wind_velocity * dt + random_diffusion
       next.push({
         ...p,
-        lng: p.lng + gaussianRandom(vLng, varStep),
-        lat: p.lat + gaussianRandom(vLat, varStep),
+        lng: p.lng + wind_u + randomUniform(varStep),
+        lat: p.lat + wind_v + randomUniform(varStep),
         life: newLife
       });
     }
