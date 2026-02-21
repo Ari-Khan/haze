@@ -118,7 +118,7 @@ const App = () => {
   useEffect(() => {
     if (view !== 'Live') { setWindForecast(null); return; }
     const fetchWind = () => {
-      fetch('http://localhost:3001/wind')
+      fetch('/api/wind')
         .then(r => r.json())
         .then(data => setWindForecast(data))
         .catch(() => {});

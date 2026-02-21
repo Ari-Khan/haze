@@ -25,6 +25,7 @@ for (let i = 1; i < lines.length; i++) {
 console.log(`Loaded ${allRecords.length} fires`);
 
 app.get("/fires", (_req, res) => res.json(allRecords));
+app.get("/api/fires", (_req, res) => res.json(allRecords));
 
 /* ───────── Wind data (Open-Meteo hourly forecast grid, cached) ───────── */
 // Grid covering Canadian fire regions: every 5° lat, 10° lon
@@ -81,7 +82,10 @@ async function fetchWindForecast() {
   return { times, grids, fetchedAt: new Date().toISOString() };
 }
 
-app.get("/wind", async (_req, res) => {
+app.get("/wind", windHandler);
+app.get("/api/wind", windHandler);
+
+async function windHandler(_req, res) {
   const now = Date.now();
   if (windCache.data && now - windCache.fetchedAt < WIND_CACHE_TTL) {
     return res.json(windCache.data);
@@ -99,7 +103,7 @@ app.get("/wind", async (_req, res) => {
     if (windCache.data) return res.json(windCache.data);
     res.status(500).json({ error: "Failed to fetch wind data" });
   }
-});
+}
 
 /* ───────── Start ───────── */
 const PORT = 3001;

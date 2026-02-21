@@ -1,0 +1,18 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/api/fires", "destination": "/api/fires" },
+    { "source": "/api/wind", "destination": "/api/wind" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/fires.js": {
+      "includeFiles": "src/data/nasaFires.csv"
+    },
+    "api/wind.js": {
+      "maxDuration": 30
+    }
+  }
+}
