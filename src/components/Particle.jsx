@@ -9,20 +9,39 @@ export const createParticle = (lng = -79.3948, lat = 43.6532) => ({
   id: Math.random(),
   lng,
   lat,
-  life: 2,
+  life: 1.0,
   size: 3,
 });
 
-export const updateParticles = (prev, windSpeed, variance) => {
-  const moved = prev
-    .map((p) => ({
-      ...p,
-      lng: p.lng + gaussianRandom(windSpeed, variance),
-      lat: p.lat + gaussianRandom(0, variance),
-      life: p.life - 0.0025,
-    }))
-    .filter((p) => p.life > 0);
+// timeScale factor: minutes simulated per real second
+const TIME_SCALE = 60;
 
-  if (moved.length < 800) moved.push(createParticle());
-  return moved;
+export const updateParticles = (prev, windSpeed, variance, fires = [], windHeading = 0, timeScale = TIME_SCALE) => {
+  const headingRad = (windHeading * Math.PI) / 180;
+  const vLng = Math.cos(headingRad) * windSpeed * timeScale;
+  const vLat = Math.sin(headingRad) * windSpeed * timeScale;
+  const varStep = variance * timeScale;
+
+  const next = [];
+  for (let i = 0; i < prev.length; i++) {
+    const p = prev[i];
+    const newLife = p.life - 0.005;
+    if (newLife > 0) {
+      next.push({
+        ...p,
+        lng: p.lng + gaussianRandom(vLng, varStep),
+        lat: p.lat + gaussianRandom(vLat, varStep),
+        life: newLife
+      });
+    }
+  }
+
+  for (let j = 0; j < fires.length; j++) {
+    if (fires[j].active) {
+      for (let k = 0; k < 3; k++) {
+        next.push(createParticle(fires[j].lng, fires[j].lat));
+      }
+    }
+  }
+  return next;
 };
