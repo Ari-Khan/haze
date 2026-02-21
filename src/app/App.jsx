@@ -3,6 +3,7 @@ import { updateParticles } from '../components/Particle';
 import MapDisplay from '../components/Map';
 import ControlPanel from '../components/ControlPanel';
 import ViewSwitcher from '../components/View';
+import { getWindGridAtTime } from '../utils/windInterpolation';
 import firesCsv from '../data/nasaFires.csv?raw';
 import '../index.css';
 
@@ -55,17 +56,17 @@ const App = () => {
   const [simPaused, setSimPaused] = useState(false);
   const [nasaFires, setNasaFires] = useState([]);
   const [particleDensity, setParticleDensity] = useState(50);
-  const [windGrid, setWindGrid] = useState(null);
+  const [windForecast, setWindForecast] = useState(null); // { times, grids } from server
   // Start sim at 6 PM UTC
   const START_DATE = new Date('2026-02-21T18:00:00Z').getTime();
   const [simTime, setSimTime] = useState(START_DATE);
   
   const requestRef = useRef();
-  const stateRef = useRef({ windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windGrid, _simTime: simTime });
+  const stateRef = useRef({ windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windForecast, _simTime: simTime });
 
   useEffect(() => {
-    stateRef.current = { windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windGrid, _simTime: simTime };
-  }, [windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windGrid, simTime]);
+    stateRef.current = { windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windForecast, _simTime: simTime };
+  }, [windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windForecast, simTime]);
 
   const animate = () => {
     setWindSpeed(ws => {
@@ -104,7 +105,7 @@ const App = () => {
         s.windHeading,
         60,
         s.particleDensity / 100,
-        s.view === 'Live' ? s.windGrid : null,
+        s.view === 'Live' ? getWindGridAtTime(s.windForecast, currentSimTime) : null,
       ));
     }
     requestRef.current = requestAnimationFrame(animate);
@@ -115,15 +116,15 @@ const App = () => {
   }, [view]);
 
   useEffect(() => {
-    if (view !== 'Live') { setWindGrid(null); return; }
+    if (view !== 'Live') { setWindForecast(null); return; }
     const fetchWind = () => {
       fetch('http://localhost:3001/wind')
         .then(r => r.json())
-        .then(data => setWindGrid(data.grid || null))
+        .then(data => setWindForecast(data))
         .catch(() => {});
     };
     fetchWind();
-    const interval = setInterval(fetchWind, 600000);
+    const interval = setInterval(fetchWind, 3600000); // re-fetch every hour
     return () => clearInterval(interval);
   }, [view]);
 
@@ -150,7 +151,11 @@ const App = () => {
       <ViewSwitcher view={view} setView={(v) => {
         setParticles([]);
         setSimTime(START_DATE);
-        if (v === 'Live') setSimPaused(true);
+        if (v === 'Live') {
+          setSimPaused(true);
+        } else {
+          setSimPaused(false);
+        }
         setView(v);
       }} />
       {sidebarOpen ? (
@@ -171,7 +176,7 @@ const App = () => {
             particleDensity={particleDensity}
             setParticleDensity={setParticleDensity}
             view={view}
-            windGrid={windGrid}
+            windGrid={windForecast && windForecast.times ? getWindGridAtTime(windForecast, simTime) : null}
           />
         </div>
       ) : (

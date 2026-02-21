@@ -26,7 +26,7 @@ console.log(`Loaded ${allRecords.length} fires`);
 
 app.get("/fires", (_req, res) => res.json(allRecords));
 
-/* ───────── Wind data (Open-Meteo grid, cached) ───────── */
+/* ───────── Wind data (Open-Meteo hourly forecast grid, cached) ───────── */
 // Grid covering Canadian fire regions: every 5° lat, 10° lon
 const WIND_GRID = [];
 for (let lat = 45; lat <= 65; lat += 5) {
@@ -37,42 +37,48 @@ for (let lat = 45; lat <= 65; lat += 5) {
 // 5 lat × 8 lon = 40 grid points
 
 let windCache = { data: null, fetchedAt: 0 };
-const WIND_CACHE_TTL = 10 * 60 * 1000; // refresh every 10 min
+const WIND_CACHE_TTL = 60 * 60 * 1000; // refresh hourly
 
-async function fetchWindGrid() {
+async function fetchWindForecast() {
   const lats = WIND_GRID.map(p => p.lat).join(",");
   const lons = WIND_GRID.map(p => p.lon).join(",");
 
+  // Fetch hourly forecast for next 7 days
   const url =
     `https://api.open-meteo.com/v1/forecast` +
     `?latitude=${lats}&longitude=${lons}` +
-    `&current=wind_speed_10m,wind_direction_10m` +
-    `&timezone=auto`;
+    `&hourly=wind_speed_10m,wind_direction_10m` +
+    `&timezone=UTC` +
+    `&forecast_days=7`;
 
   const resp = await fetch(url);
   const json = await resp.json();
 
-  // Open-Meteo returns an array when multiple lat/lon provided
   const results = Array.isArray(json) ? json : [json];
 
-  const grid = results.map((r, i) => {
-    const spd = r.current.wind_speed_10m;     // km/h
-    const dir = r.current.wind_direction_10m;  // meteorological: where wind comes FROM
-    // Convert to "heading toward" for simulation
-    const heading = (dir + 180) % 360;
-    return {
-      lat: WIND_GRID[i].lat,
-      lon: WIND_GRID[i].lon,
-      speed: Math.round(spd * 10) / 10,   // km/h
-      direction: dir,                       // where wind comes FROM
-      heading: Math.round(heading),         // where wind blows TOWARD
-    };
-  });
+  // Build time-indexed grids: { times: [isoString...], grids: { [isoTime]: [{lat,lon,speed,heading}...] } }
+  const times = results[0].hourly.time; // all stations share same time array
+  const grids = {};
 
-  return {
-    grid,
-    fetchedAt: new Date().toISOString(),
-  };
+  for (let t = 0; t < times.length; t++) {
+    const timeKey = times[t]; // e.g. "2026-02-21T18:00"
+    const grid = [];
+    for (let i = 0; i < results.length; i++) {
+      const spd = results[i].hourly.wind_speed_10m[t];     // km/h
+      const dir = results[i].hourly.wind_direction_10m[t];  // meteorological
+      const heading = (dir + 180) % 360;
+      grid.push({
+        lat: WIND_GRID[i].lat,
+        lon: WIND_GRID[i].lon,
+        speed: Math.round(spd * 10) / 10,
+        direction: dir,
+        heading: Math.round(heading),
+      });
+    }
+    grids[timeKey] = grid;
+  }
+
+  return { times, grids, fetchedAt: new Date().toISOString() };
 }
 
 app.get("/wind", async (_req, res) => {
@@ -82,17 +88,15 @@ app.get("/wind", async (_req, res) => {
   }
 
   try {
-    windCache.data = await fetchWindGrid();
+    windCache.data = await fetchWindForecast();
     windCache.fetchedAt = now;
-    const speeds = windCache.data.grid.map(p => p.speed);
     console.log(
-      `Wind grid updated: ${windCache.data.grid.length} points, ` +
-      `${Math.min(...speeds)}–${Math.max(...speeds)} km/h`
+      `Wind forecast updated: ${WIND_GRID.length} points × ${windCache.data.times.length} hours`
     );
     res.json(windCache.data);
   } catch (err) {
     console.error("Wind fetch error:", err.message);
-    if (windCache.data) return res.json(windCache.data); // serve stale
+    if (windCache.data) return res.json(windCache.data);
     res.status(500).json({ error: "Failed to fetch wind data" });
   }
 });

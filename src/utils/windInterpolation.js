@@ -54,20 +54,56 @@ export function interpolateWind(lat, lon, grid) {
 }
 
 /**
- * Convert a wind grid (km/h, degrees) into the internal unit system
- * used by Particle.jsx (degrees-per-second, radians).
- * Returns a pre-processed grid for fast per-particle lookup.
+ * Given the full wind forecast data and a sim timestamp (ms),
+ * return the appropriate spatial grid, interpolated between the two
+ * bracketing hourly snapshots.
+ *
+ * @param {{ times: string[], grids: Object }} windForecast
+ * @param {number} simTimeMs  simulation time in epoch ms
+ * @returns {Array|null}  [{lat, lon, speed, heading}, ...] or null
  */
-const KMH_TO_INTERNAL = 1 / (111.32 * 3600);
+export function getWindGridAtTime(windForecast, simTimeMs) {
+  if (!windForecast || !windForecast.times || windForecast.times.length === 0) return null;
 
-export function preprocessWindGrid(grid) {
-  if (!grid) return null;
-  return grid.map(p => ({
-    lat: p.lat,
-    lon: p.lon,
-    speed: p.speed,
-    heading: p.heading,
-    // Pre-compute internal-unit wind vector components
-    internalSpeed: p.speed * KMH_TO_INTERNAL,
-  }));
+  const { times, grids } = windForecast;
+
+  // Convert ISO times to epoch ms (Open-Meteo returns "2026-02-21T18:00" without Z, but we requested UTC)
+  // Add 'Z' if missing to ensure UTC parsing
+  const epochTimes = times.map(t => new Date(t.endsWith('Z') ? t : t + 'Z').getTime());
+
+  // Clamp to available range
+  if (simTimeMs <= epochTimes[0]) return grids[times[0]];
+  if (simTimeMs >= epochTimes[epochTimes.length - 1]) return grids[times[times.length - 1]];
+
+  // Find bracketing hours
+  let lo = 0;
+  for (let i = 1; i < epochTimes.length; i++) {
+    if (epochTimes[i] > simTimeMs) { lo = i - 1; break; }
+  }
+  const hi = lo + 1;
+  const t0 = epochTimes[lo];
+  const t1 = epochTimes[hi];
+  const frac = (simTimeMs - t0) / (t1 - t0); // 0..1 between hours
+
+  const gridA = grids[times[lo]];
+  const gridB = grids[times[hi]];
+
+  if (!gridA) return gridB;
+  if (!gridB) return gridA;
+
+  // Linearly interpolate speed; circularly interpolate heading
+  return gridA.map((a, i) => {
+    const b = gridB[i];
+    const speed = a.speed + frac * (b.speed - a.speed);
+
+    // Circular interpolation for heading
+    const radA = a.heading * DEG2RAD;
+    const radB = b.heading * DEG2RAD;
+    const sinH = Math.sin(radA) * (1 - frac) + Math.sin(radB) * frac;
+    const cosH = Math.cos(radA) * (1 - frac) + Math.cos(radB) * frac;
+    let heading = Math.atan2(sinH, cosH) / DEG2RAD;
+    if (heading < 0) heading += 360;
+
+    return { lat: a.lat, lon: a.lon, speed, heading: Math.round(heading) };
+  });
 }
