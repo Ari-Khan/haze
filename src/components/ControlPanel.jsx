@@ -1,9 +1,10 @@
-import React from 'react';
-
-const ControlPanel = ({ windSpeed, setWindSpeed, variance, setVariance }) => {
+const ControlPanel = ({ windSpeed, setWindSpeed, variance, setVariance, onClose }) => {
   return (
-    <div className="sidebar">
-      <h2>HAZE</h2>
+    <div>
+      <div className="sidebar-header">
+        <h2>HAZE</h2>
+        <button className="close-btn" onClick={onClose}>&times;</button>
+      </div>
       <div className="control-group">
         <div className="control-label">
           <span>Wind Velocity</span>
