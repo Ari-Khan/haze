@@ -20,6 +20,7 @@ const App = () => {
   const [windSpeed, setWindSpeed] = useState(10 / (111.32 * 3600));
   const [targetWindSpeed, setTargetWindSpeed] = useState(10 / (111.32 * 3600));
   const [simPaused, setSimPaused] = useState(false);
+  const [nasaFires, setNasaFires] = useState([]);
   
   const requestRef = useRef();
   const stateRef = useRef({ windSpeed, variance, windHeading, fires, simPaused });
@@ -57,6 +58,22 @@ const App = () => {
   };
 
   useEffect(() => {
+    const fetchFires = async () => {
+      try {
+        const res = await fetch("http://localhost:3001/fires");
+        const data = await res.json();
+        setNasaFires(data);
+      } catch (err) {
+        console.error("Error fetching NASA fire data:", err);
+      }
+    };
+
+    fetchFires();
+    const interval = setInterval(fetchFires, 60 * 60 * 1000); // Refresh every hour
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     requestRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(requestRef.current);
   }, [targetWindSpeed, targetVariance, targetWindHeading]);
@@ -69,6 +86,21 @@ const App = () => {
       properties: { opacity: p.life, size: p.size }
     }))
   }), [particles]);
+
+  const nasaFireGeoJSON = useMemo(() => ({
+    type: "FeatureCollection",
+    features: nasaFires.map(fire => ({
+      type: "Feature",
+      geometry: {
+        type: "Point",
+        coordinates: [parseFloat(fire.longitude), parseFloat(fire.latitude)]
+      },
+      properties: {
+        brightness: fire.brightness,
+        confidence: fire.confidence
+      }
+    }))
+  }), [nasaFires]);
 
   return (
     <div className="haze-container">
