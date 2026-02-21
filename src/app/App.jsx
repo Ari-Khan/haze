@@ -3,7 +3,29 @@ import { updateParticles } from '../components/Particle';
 import MapDisplay from '../components/Map';
 import ControlPanel from '../components/ControlPanel';
 import ViewSwitcher from '../components/View';
+import firesCsv from '../data/nasaFires.csv?raw';
 import '../index.css';
+
+// Parse CSV and filter to Canada (lat 41–83, lon -141 to -53)
+function parseCanadaFires(csv) {
+  const lines = csv.trim().split('\n');
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',');
+  const results = [];
+  for (let i = 1; i < lines.length; i++) {
+    const vals = lines[i].split(',');
+    const obj = {};
+    for (let j = 0; j < headers.length; j++) {
+      obj[headers[j].trim()] = (vals[j] || '').trim();
+    }
+    const lat = parseFloat(obj.latitude);
+    const lng = parseFloat(obj.longitude);
+    if (lat >= 41 && lat <= 83 && lng >= -141 && lng <= -53) {
+      results.push(obj);
+    }
+  }
+  return results;
+}
 
 const App = () => {
   const [view, setView] = useState('Sim');
@@ -17,17 +39,21 @@ const App = () => {
   const [fireLocation, setFireLocation] = useState(null);
   const [fireScreenPos, setFireScreenPos] = useState(null);
   const [displayFireButton, setDisplayFireButton] = useState(false);
-  const [windSpeed, setWindSpeed] = useState(10 / (111.32 * 3600));
-  const [targetWindSpeed, setTargetWindSpeed] = useState(10 / (111.32 * 3600));
+  const [windSpeed, setWindSpeed] = useState(15 / (111.32 * 3600));
+  const [targetWindSpeed, setTargetWindSpeed] = useState(15 / (111.32 * 3600));
   const [simPaused, setSimPaused] = useState(false);
   const [nasaFires, setNasaFires] = useState([]);
+  const [particleDensity, setParticleDensity] = useState(50);
+  // Simulation clock: milliseconds since start date (2026-02-21 18:00)
+  const START_DATE = new Date('2026-02-21T18:00:00').getTime();
+  const [simTime, setSimTime] = useState(START_DATE);
   
   const requestRef = useRef();
-  const stateRef = useRef({ windSpeed, variance, windHeading, fires, simPaused, view, nasaFires });
+  const stateRef = useRef({ windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity });
 
   useEffect(() => {
-    stateRef.current = { windSpeed, variance, windHeading, fires, simPaused, view, nasaFires };
-  }, [windSpeed, variance, windHeading, fires, simPaused, view, nasaFires]);
+    stateRef.current = { windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity };
+  }, [windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity]);
 
   const animate = () => {
     setWindSpeed(ws => {
@@ -46,6 +72,8 @@ const App = () => {
     });
 
     if (!stateRef.current.simPaused) {
+      // Advance clock: 1 hour per real second = 60 min per sec = 1 min per frame at 60fps
+      setSimTime(t => t + 60 * 1000); // +1 minute per frame
       const s = stateRef.current;
       const activeFires = s.view === 'Live'
         ? s.nasaFires.map(f => ({ lng: parseFloat(f.longitude), lat: parseFloat(f.latitude), active: true }))
@@ -55,25 +83,18 @@ const App = () => {
         s.windSpeed, 
         s.variance, 
         activeFires, 
-        s.windHeading, 
+        s.windHeading,
+        undefined,
+        s.particleDensity / 100,
       ));
     }
     requestRef.current = requestAnimationFrame(animate);
   };
 
-  // Fetch NASA fires only when switching to Live view
+  // Load NASA fires from local CSV when switching to Live view
   useEffect(() => {
     if (view !== 'Live') return;
-    const fetchFires = async () => {
-      try {
-        const res = await fetch("http://localhost:3001/fires");
-        const data = await res.json();
-        setNasaFires(data);
-      } catch (err) {
-        console.error("Error fetching NASA fire data:", err);
-      }
-    };
-    fetchFires();
+    setNasaFires(parseCanadaFires(firesCsv));
   }, [view]);
 
   useEffect(() => {
@@ -109,6 +130,7 @@ const App = () => {
     <div className="haze-container">
       <ViewSwitcher view={view} setView={(v) => {
         setParticles([]);
+        setSimTime(START_DATE);
         if (v === 'Live') {
           setSimPaused(true);
         }
@@ -128,7 +150,9 @@ const App = () => {
             stopFire={idx => setFires(f => f.map((item, i) => i === idx ? { ...item, active: false } : item))}
             simPaused={simPaused}
             setSimPaused={setSimPaused}
-            resetSim={() => { setParticles([]); setFires([]); }}
+            resetSim={() => { setParticles([]); setFires([]); setSimTime(START_DATE); }}
+            particleDensity={particleDensity}
+            setParticleDensity={setParticleDensity}
           />
         </div>
       ) : (
@@ -153,6 +177,11 @@ const App = () => {
           }}>Simulate Fire</button>
         </div>
       )}
+      <div className="sim-clock">
+        {new Date(simTime).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+        {' '}
+        {new Date(simTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+      </div>
     </div>
   );
 };

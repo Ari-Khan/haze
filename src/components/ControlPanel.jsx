@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ControlPanel = ({ windSpeed, setWindSpeed, variance, setVariance, windHeading, setWindHeading, onClose, fires, stopFire, simPaused, setSimPaused, resetSim }) => {
+const ControlPanel = ({ windSpeed, setWindSpeed, variance, setVariance, windHeading, setWindHeading, onClose, fires, stopFire, simPaused, setSimPaused, resetSim, particleDensity, setParticleDensity }) => {
   return (
     <div>
       <div className="sidebar-header">
@@ -27,6 +27,13 @@ const ControlPanel = ({ windSpeed, setWindSpeed, variance, setVariance, windHead
           <span>{windHeading}&deg;</span>
         </div>
         <input className="slider" type="range" min="0" max="360" step="1" value={windHeading} onChange={(e) => setWindHeading(parseInt(e.target.value))} />
+      </div>
+      <div className="control-group">
+        <div className="control-label">
+          <span>Particle Density</span>
+          <span>{particleDensity}%</span>
+        </div>
+        <input className="slider" type="range" min="0" max="100" step="1" value={particleDensity} onChange={(e) => setParticleDensity(parseInt(e.target.value))} />
       </div>
       <div className="fire-list">
         <div className="control-label" style={{marginBottom: 8}}><span>Simulation</span></div>
