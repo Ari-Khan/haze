@@ -17,9 +17,9 @@ const ControlPanel = ({ windSpeed, setWindSpeed, variance, setVariance, windHead
       <div className="control-group">
         <div className="control-label">
           <span>Turbulence</span>
-          <span>{variance.toFixed(4)}</span>
+          <span>{variance}%</span>
         </div>
-        <input className="slider" type="range" min="0" max="0.001" step="0.00001" value={variance} onChange={(e) => setVariance(parseFloat(e.target.value))} />
+        <input className="slider" type="range" min="0" max="100" step="1" value={variance} onChange={(e) => setVariance(parseInt(e.target.value))} />
       </div>
       <div className="control-group">
         <div className="control-label">

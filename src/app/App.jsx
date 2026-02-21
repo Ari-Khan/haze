@@ -9,9 +9,9 @@ const App = () => {
   const [view, setView] = useState('Sim');
   const [particles, setParticles] = useState([]);
   const [fires, setFires] = useState([]);
-  const [variance, setVariance] = useState(0.0002);
+  const [variance, setVariance] = useState(0.00003);
   const [windHeading, setWindHeading] = useState(0);
-  const [targetVariance, setTargetVariance] = useState(0.0002);
+  const [targetVariance, setTargetVariance] = useState(0.00003);
   const [targetWindHeading, setTargetWindHeading] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [fireLocation, setFireLocation] = useState(null);
@@ -23,11 +23,11 @@ const App = () => {
   const [nasaFires, setNasaFires] = useState([]);
   
   const requestRef = useRef();
-  const stateRef = useRef({ windSpeed, variance, windHeading, fires, simPaused });
+  const stateRef = useRef({ windSpeed, variance, windHeading, fires, simPaused, view, nasaFires });
 
   useEffect(() => {
-    stateRef.current = { windSpeed, variance, windHeading, fires, simPaused };
-  }, [windSpeed, variance, windHeading, fires, simPaused]);
+    stateRef.current = { windSpeed, variance, windHeading, fires, simPaused, view, nasaFires };
+  }, [windSpeed, variance, windHeading, fires, simPaused, view, nasaFires]);
 
   const animate = () => {
     setWindSpeed(ws => {
@@ -46,18 +46,24 @@ const App = () => {
     });
 
     if (!stateRef.current.simPaused) {
+      const s = stateRef.current;
+      const activeFires = s.view === 'Live'
+        ? s.nasaFires.map(f => ({ lng: parseFloat(f.longitude), lat: parseFloat(f.latitude), active: true }))
+        : s.fires;
       setParticles(prev => updateParticles(
         prev, 
-        stateRef.current.windSpeed, 
-        stateRef.current.variance, 
-        stateRef.current.fires, 
-        stateRef.current.windHeading, 
+        s.windSpeed, 
+        s.variance, 
+        activeFires, 
+        s.windHeading, 
       ));
     }
     requestRef.current = requestAnimationFrame(animate);
   };
 
+  // Fetch NASA fires only when switching to Live view
   useEffect(() => {
+    if (view !== 'Live') return;
     const fetchFires = async () => {
       try {
         const res = await fetch("http://localhost:3001/fires");
@@ -67,11 +73,8 @@ const App = () => {
         console.error("Error fetching NASA fire data:", err);
       }
     };
-
     fetchFires();
-    const interval = setInterval(fetchFires, 60 * 60 * 1000); // Refresh every hour
-    return () => clearInterval(interval);
-  }, []);
+  }, [view]);
 
   useEffect(() => {
     requestRef.current = requestAnimationFrame(animate);
@@ -104,14 +107,20 @@ const App = () => {
 
   return (
     <div className="haze-container">
-      <ViewSwitcher view={view} setView={setView} />
+      <ViewSwitcher view={view} setView={(v) => {
+        setParticles([]);
+        if (v === 'Live') {
+          setSimPaused(true);
+        }
+        setView(v);
+      }} />
       {sidebarOpen ? (
         <div className="right-sidebar">
           <ControlPanel 
             windSpeed={Math.round(targetWindSpeed * 111.32 * 3600)}
             setWindSpeed={kmh => setTargetWindSpeed(kmh / (111.32 * 3600))} 
-            variance={targetVariance} 
-            setVariance={setTargetVariance} 
+            variance={Math.round(targetVariance / 0.00006 * 100)} 
+            setVariance={pct => setTargetVariance(pct / 100 * 0.00006)} 
             windHeading={targetWindHeading}
             setWindHeading={setTargetWindHeading}
             onClose={() => setSidebarOpen(false)}

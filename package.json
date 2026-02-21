@@ -13,6 +13,8 @@
     "@turf/bbox": "^7.3.4",
     "@turf/boolean-point-in-polygon": "^7.3.4",
     "@turf/random": "^7.3.4",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "maplibre-gl": "^5.18.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
