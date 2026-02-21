@@ -15,7 +15,10 @@ const getColor = (drift, expectedSpread) => {
 };
 
 export const createParticle = (lng = -79.3948, lat = 43.6532) => {
-  const lifetimeFrames = (336 + Math.random() * 168) * 60;
+  // Random lifetime: 6 hours to 2 days (6–48 sim-hours)
+  const lifetimeHours = 6 + Math.random() * 42;
+  // At 60fps, 1 frame = 1 sim-minute, so 1 sim-hour = 60 frames
+  const lifetimeFrames = lifetimeHours * 60;
   return {
     id: Math.random(),
     lng,
@@ -29,22 +32,15 @@ export const createParticle = (lng = -79.3948, lat = 43.6532) => {
   };
 };
 
-// timeScale factor: minutes simulated per real second
 const TIME_SCALE = 60;
 
-// Random uniform distribution between -range and range
-const randomUniform = (range) => (Math.random() - 0.5) * 2 * range;
-
-export const updateParticles = (prev, windSpeed, variance, fires = [], windHeading = 0, timeScale = TIME_SCALE) => {
-  // Convert wind heading and speed to u,v components (Navier-Stokes)
+export const updateParticles = (prev, windSpeed, variance, fires = [], windHeading = 0, timeScale = TIME_SCALE, density = 0.5, windGrid = null) => {
   const headingRad = (windHeading * Math.PI) / 180;
-  const dt = timeScale; // time step scaling
+  const dt = timeScale;
   
-  // Wind velocity components (wind_u, wind_v)
-  const wind_u = Math.cos(headingRad) * windSpeed * dt;
-  const wind_v = Math.sin(headingRad) * windSpeed * dt;
+  const globalVLng = Math.cos(headingRad) * windSpeed * dt;
+  const globalVLat = Math.sin(headingRad) * windSpeed * dt;
   
-  // Diffusion/turbulence variance
   const varStep = variance * dt;
 
   const next = [];
@@ -52,16 +48,19 @@ export const updateParticles = (prev, windSpeed, variance, fires = [], windHeadi
 
   for (let i = 0; i < len; i++) {
     const p = prev[i];
-    const newLife = p.life - 0.005;
-    if (newLife > 0) {
-      // Navier-Stokes particle update:
-      // position += wind_velocity * dt + random_diffusion
-      next.push({
-        ...p,
-        lng: p.lng + wind_u + randomUniform(varStep),
-        lat: p.lat + wind_v + randomUniform(varStep),
-        life: newLife
-      });
+    const nextLife = p.life - p.decay;
+    if (nextLife <= 0) continue;
+
+    let vLng, vLat;
+    if (windGrid) {
+      const w = interpolateWind(p.lat, p.lng, windGrid);
+      const spd = w.speed * KMH_TO_INTERNAL * dt;
+      const hRad = (w.heading * Math.PI) / 180;
+      vLng = Math.cos(hRad) * spd;
+      vLat = Math.sin(hRad) * spd;
+    } else {
+      vLng = globalVLng;
+      vLat = globalVLat;
     }
 
     const u1 = Math.random();

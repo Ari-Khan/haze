@@ -6,16 +6,35 @@ import ViewSwitcher from '../components/View';
 import firesCsv from '../data/nasaFires.csv?raw';
 import '../index.css';
 
+// Map bright_ti4 → fire spawn duration in milliseconds
+// ~298 K → 12 hours, ~340+ K → 4 days (linear interpolation clamped)
+function fireDurationMs(bright) {
+  const MIN_BRIGHT = 298;
+  const MAX_BRIGHT = 340;
+  const MIN_HOURS = 12;
+  const MAX_HOURS = 4 * 24; // 96 hours
+  const t = Math.max(0, Math.min(1, (bright - MIN_BRIGHT) / (MAX_BRIGHT - MIN_BRIGHT)));
+  const hours = MIN_HOURS + t * (MAX_HOURS - MIN_HOURS);
+  return hours * 3600 * 1000; // ms
+}
+
 function parseFires(csv) {
   const lines = csv.trim().split('\n');
   if (lines.length < 2) return [];
   const headers = lines[0].split(',');
   return lines.slice(1).map(line => {
     const vals = line.split(',');
-    return headers.reduce((obj, header, i) => {
-      obj[header.trim()] = (vals[i] || '').trim();
-      return obj;
+    const obj = headers.reduce((o, header, i) => {
+      o[header.trim()] = (vals[i] || '').trim();
+      return o;
     }, {});
+    // Compute fire start time and duration from brightness
+    const timeStr = obj.acq_time.padStart(4, '0');
+    const hh = timeStr.slice(0, 2);
+    const mm = timeStr.slice(2, 4);
+    obj._startMs = new Date(`${obj.acq_date}T${hh}:${mm}:00Z`).getTime();
+    obj._durationMs = fireDurationMs(parseFloat(obj.bright_ti4) || 298);
+    return obj;
   });
 }
 
@@ -37,15 +56,16 @@ const App = () => {
   const [nasaFires, setNasaFires] = useState([]);
   const [particleDensity, setParticleDensity] = useState(50);
   const [windGrid, setWindGrid] = useState(null);
-  const START_DATE = new Date('2026-02-21T18:00:00').getTime();
+  // Start sim at 6 PM UTC
+  const START_DATE = new Date('2026-02-21T18:00:00Z').getTime();
   const [simTime, setSimTime] = useState(START_DATE);
   
   const requestRef = useRef();
-  const stateRef = useRef({ windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windGrid });
+  const stateRef = useRef({ windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windGrid, _simTime: simTime });
 
   useEffect(() => {
-    stateRef.current = { windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windGrid };
-  }, [windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windGrid]);
+    stateRef.current = { windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windGrid, _simTime: simTime };
+  }, [windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windGrid, simTime]);
 
   const animate = () => {
     setWindSpeed(ws => {
@@ -64,10 +84,16 @@ const App = () => {
     });
 
     if (!stateRef.current.simPaused) {
-      setSimTime(t => t + 60000);
+      setSimTime(t => {
+        stateRef.current._simTime = t + 60000;
+        return t + 60000;
+      });
       const s = stateRef.current;
+      const currentSimTime = s._simTime;
       const activeFires = s.view === 'Live'
-        ? s.nasaFires.map(f => ({ lng: parseFloat(f.longitude), lat: parseFloat(f.latitude), active: true }))
+        ? s.nasaFires
+            .filter(f => currentSimTime >= f._startMs && currentSimTime < f._startMs + f._durationMs)
+            .map(f => ({ lng: parseFloat(f.longitude), lat: parseFloat(f.latitude), active: true }))
         : s.fires;
       
       setParticles(prev => updateParticles(
