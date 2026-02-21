@@ -68,9 +68,4 @@ body, html, #root {
   background: #90a4ae;
   border-radius: 50%;
   cursor: pointer;
-  transition: transform 0.1s ease;
-}
-
-.slider::-webkit-slider-thumb:hover {
-  transform: scale(1.2);
 }

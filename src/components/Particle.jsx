@@ -9,17 +9,19 @@ export const createParticle = (lng = -79.3948, lat = 43.6532) => ({
   id: Math.random(),
   lng,
   lat,
-  life: 1.0,
-  size: Math.random() * 20 + 10
+  life: 2,
+  size: 3,
 });
 
 export const updateParticles = (prev, windSpeed, variance) => {
-  const moved = prev.map(p => ({
-    ...p,
-    lng: p.lng + gaussianRandom(windSpeed, variance),
-    lat: p.lat + gaussianRandom(0, variance),
-    life: p.life - 0.0025
-  })).filter(p => p.life > 0);
+  const moved = prev
+    .map((p) => ({
+      ...p,
+      lng: p.lng + gaussianRandom(windSpeed, variance),
+      lat: p.lat + gaussianRandom(0, variance),
+      life: p.life - 0.0025,
+    }))
+    .filter((p) => p.life > 0);
 
   if (moved.length < 800) moved.push(createParticle());
   return moved;

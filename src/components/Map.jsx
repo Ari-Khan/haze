@@ -12,12 +12,14 @@ const MapDisplay = ({ geojsonData }) => {
         <Layer
           id="haze-layer"
           type="circle"
-          paint={{
-            'circle-radius': ['get', 'size'],
-            'circle-color': '#90a4ae',
-            'circle-opacity': ['get', 'opacity'],
-            'circle-blur': 2.5
-          }}
+            paint={{
+              'circle-radius': ['get', 'size'],
+              'circle-color': '#ff0000',
+              'circle-opacity': 1,
+              'circle-blur': 0,
+              'circle-pitch-scale': 'viewport',
+              'circle-pitch-alignment': 'viewport'
+            }}
         />
       </Source>
     </Map>
