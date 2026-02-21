@@ -21,16 +21,8 @@ for (let i = 1; i < lines.length; i++) {
   allRecords.push(obj);
 }
 
-const canadaFires = allRecords.filter(r => {
-  const lat = parseFloat(r.latitude);
-  const lng = parseFloat(r.longitude);
-  return lat >= 41 && lat <= 83 && lng >= -141 && lng <= -53;
-});
-
-console.log(`Loaded ${allRecords.length} total fires, ${canadaFires.length} in Canada`);
+console.log(`Loaded ${allRecords.length} fires`);
 
 app.get("/fires", (req, res) => {
-  res.json(canadaFires);
+  res.json(allRecords);
 });
-
-app.listen(3001, () => console.log("Fire data server running on http://localhost:3001"));

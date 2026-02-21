@@ -6,25 +6,17 @@ import ViewSwitcher from '../components/View';
 import firesCsv from '../data/nasaFires.csv?raw';
 import '../index.css';
 
-// Parse CSV and filter to Canada (lat 41–83, lon -141 to -53)
-function parseCanadaFires(csv) {
+function parseFires(csv) {
   const lines = csv.trim().split('\n');
   if (lines.length < 2) return [];
   const headers = lines[0].split(',');
-  const results = [];
-  for (let i = 1; i < lines.length; i++) {
-    const vals = lines[i].split(',');
-    const obj = {};
-    for (let j = 0; j < headers.length; j++) {
-      obj[headers[j].trim()] = (vals[j] || '').trim();
-    }
-    const lat = parseFloat(obj.latitude);
-    const lng = parseFloat(obj.longitude);
-    if (lat >= 41 && lat <= 83 && lng >= -141 && lng <= -53) {
-      results.push(obj);
-    }
-  }
-  return results;
+  return lines.slice(1).map(line => {
+    const vals = line.split(',');
+    return headers.reduce((obj, header, i) => {
+      obj[header.trim()] = (vals[i] || '').trim();
+      return obj;
+    }, {});
+  });
 }
 
 const App = () => {
@@ -44,16 +36,16 @@ const App = () => {
   const [simPaused, setSimPaused] = useState(false);
   const [nasaFires, setNasaFires] = useState([]);
   const [particleDensity, setParticleDensity] = useState(50);
-  // Simulation clock: milliseconds since start date (2026-02-21 18:00)
+  const [windGrid, setWindGrid] = useState(null);
   const START_DATE = new Date('2026-02-21T18:00:00').getTime();
   const [simTime, setSimTime] = useState(START_DATE);
   
   const requestRef = useRef();
-  const stateRef = useRef({ windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity });
+  const stateRef = useRef({ windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windGrid });
 
   useEffect(() => {
-    stateRef.current = { windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity };
-  }, [windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity]);
+    stateRef.current = { windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windGrid };
+  }, [windSpeed, variance, windHeading, fires, simPaused, view, nasaFires, particleDensity, windGrid]);
 
   const animate = () => {
     setWindSpeed(ws => {
@@ -72,29 +64,41 @@ const App = () => {
     });
 
     if (!stateRef.current.simPaused) {
-      // Advance clock: 1 hour per real second = 60 min per sec = 1 min per frame at 60fps
-      setSimTime(t => t + 60 * 1000); // +1 minute per frame
+      setSimTime(t => t + 60000);
       const s = stateRef.current;
       const activeFires = s.view === 'Live'
         ? s.nasaFires.map(f => ({ lng: parseFloat(f.longitude), lat: parseFloat(f.latitude), active: true }))
         : s.fires;
+      
       setParticles(prev => updateParticles(
         prev, 
         s.windSpeed, 
         s.variance, 
         activeFires, 
         s.windHeading,
-        undefined,
+        60,
         s.particleDensity / 100,
+        s.view === 'Live' ? s.windGrid : null,
       ));
     }
     requestRef.current = requestAnimationFrame(animate);
   };
 
-  // Load NASA fires from local CSV when switching to Live view
   useEffect(() => {
-    if (view !== 'Live') return;
-    setNasaFires(parseCanadaFires(firesCsv));
+    if (view === 'Live') setNasaFires(parseFires(firesCsv));
+  }, [view]);
+
+  useEffect(() => {
+    if (view !== 'Live') { setWindGrid(null); return; }
+    const fetchWind = () => {
+      fetch('http://localhost:3001/wind')
+        .then(r => r.json())
+        .then(data => setWindGrid(data.grid || null))
+        .catch(() => {});
+    };
+    fetchWind();
+    const interval = setInterval(fetchWind, 600000);
+    return () => clearInterval(interval);
   }, [view]);
 
   useEffect(() => {
@@ -107,33 +111,20 @@ const App = () => {
     features: particles.map(p => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
-      properties: { opacity: p.life, size: p.size }
-    }))
-  }), [particles]);
-
-  const nasaFireGeoJSON = useMemo(() => ({
-    type: "FeatureCollection",
-    features: nasaFires.map(fire => ({
-      type: "Feature",
-      geometry: {
-        type: "Point",
-        coordinates: [parseFloat(fire.longitude), parseFloat(fire.latitude)]
-      },
-      properties: {
-        brightness: fire.brightness,
-        confidence: fire.confidence
+      properties: { 
+        opacity: p.life, 
+        size: p.size,
+        color: p.color // Fixed: Particles will now render their probability color
       }
     }))
-  }), [nasaFires]);
+  }), [particles]);
 
   return (
     <div className="haze-container">
       <ViewSwitcher view={view} setView={(v) => {
         setParticles([]);
         setSimTime(START_DATE);
-        if (v === 'Live') {
-          setSimPaused(true);
-        }
+        if (v === 'Live') setSimPaused(true);
         setView(v);
       }} />
       {sidebarOpen ? (
@@ -153,6 +144,8 @@ const App = () => {
             resetSim={() => { setParticles([]); setFires([]); setSimTime(START_DATE); }}
             particleDensity={particleDensity}
             setParticleDensity={setParticleDensity}
+            view={view}
+            windGrid={windGrid}
           />
         </div>
       ) : (

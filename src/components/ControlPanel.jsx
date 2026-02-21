@@ -1,33 +1,49 @@
 import React from 'react';
 
-const ControlPanel = ({ windSpeed, setWindSpeed, variance, setVariance, windHeading, setWindHeading, onClose, fires, stopFire, simPaused, setSimPaused, resetSim, particleDensity, setParticleDensity }) => {
+const ControlPanel = ({ windSpeed, setWindSpeed, variance, setVariance, windHeading, setWindHeading, onClose, fires, stopFire, simPaused, setSimPaused, resetSim, particleDensity, setParticleDensity, view, windGrid }) => {
+  const isLive = view === 'Live';
+
+  // Compute wind summary for Live view
+  let windSummary = null;
+  if (isLive && windGrid && windGrid.length > 0) {
+    const speeds = windGrid.map(p => p.speed);
+    const minSpd = Math.round(Math.min(...speeds));
+    const maxSpd = Math.round(Math.max(...speeds));
+    windSummary = { min: minSpd, max: maxSpd };
+  }
+
   return (
     <div>
       <div className="sidebar-header">
         <h2>HAZE</h2>
         <button className="close-btn" onClick={onClose}>&times;</button>
       </div>
-      <div className="control-group">
-        <div className="control-label">
-          <span>Wind Velocity</span>
-          <span>{windSpeed} km/h</span>
+      {isLive ? (
+        <div className="control-group">
+          <div className="control-label">
+            <span>Wind</span>
+            <span>{windSummary ? `${windSummary.min}–${windSummary.max} km/h` : 'Loading...'}</span>
+          </div>
+          <div className="wind-live-note">Spatially varying · {windGrid ? windGrid.length : 0} grid points</div>
         </div>
-        <input className="slider" type="range" min="0" max="200" step="1" value={windSpeed} onChange={(e) => setWindSpeed(parseInt(e.target.value))} />
-      </div>
-      <div className="control-group">
-        <div className="control-label">
-          <span>Turbulence</span>
-          <span>{variance}%</span>
-        </div>
-        <input className="slider" type="range" min="0" max="100" step="1" value={variance} onChange={(e) => setVariance(parseInt(e.target.value))} />
-      </div>
-      <div className="control-group">
-        <div className="control-label">
-          <span>Wind Heading</span>
-          <span>{windHeading}&deg;</span>
-        </div>
-        <input className="slider" type="range" min="0" max="360" step="1" value={windHeading} onChange={(e) => setWindHeading(parseInt(e.target.value))} />
-      </div>
+      ) : (
+        <>
+          <div className="control-group">
+            <div className="control-label">
+              <span>Wind Velocity</span>
+              <span>{windSpeed} km/h</span>
+            </div>
+            <input className="slider" type="range" min="0" max="200" step="1" value={windSpeed} onChange={(e) => setWindSpeed(parseInt(e.target.value))} />
+          </div>
+          <div className="control-group">
+            <div className="control-label">
+              <span>Wind Heading</span>
+              <span>{windHeading}&deg;</span>
+            </div>
+            <input className="slider" type="range" min="0" max="360" step="1" value={windHeading} onChange={(e) => setWindHeading(parseInt(e.target.value))} />
+          </div>
+        </>
+      )}
       <div className="control-group">
         <div className="control-label">
           <span>Particle Density</span>

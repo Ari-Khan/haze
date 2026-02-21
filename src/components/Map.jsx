@@ -19,7 +19,7 @@ const MapDisplay = ({ geojsonData, view, onMapClick }) => {
           type="circle"
           paint={{
             'circle-radius': ['get', 'size'],
-            'circle-color': '#ff0000',
+            'circle-color': ['get', 'color'],
             'circle-opacity': ['get', 'opacity'],
             'circle-blur': 0.8
           }}
