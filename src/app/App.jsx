@@ -48,6 +48,12 @@ const App = () => {
   const [targetVariance, setTargetVariance] = useState(0.00003);
   const [targetWindHeading, setTargetWindHeading] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showHint, setShowHint] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowHint(false), 4000);
+    return () => clearTimeout(timer);
+  }, []);
   const [fireLocation, setFireLocation] = useState(null);
   const [fireScreenPos, setFireScreenPos] = useState(null);
   const [displayFireButton, setDisplayFireButton] = useState(false);
@@ -206,6 +212,11 @@ const App = () => {
         {' '}
         {new Date(simTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
       </div>
+      {view === 'Sim' && (
+        <div className={`map-hint ${showHint ? 'map-hint-visible' : 'map-hint-hidden'}`}>
+          Click the map to simulate a fire
+        </div>
+      )}
     </div>
   );
 };

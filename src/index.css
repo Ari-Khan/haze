@@ -63,6 +63,31 @@
 .fire-btn:hover {
   background: #d10000;
 }
+/* Map hint toast */
+.map-hint {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  padding: 12px 28px;
+  border-radius: 12px;
+  pointer-events: none;
+  z-index: 100;
+  transition: opacity 1s ease;
+}
+.map-hint-visible {
+  opacity: 1;
+}
+.map-hint-hidden {
+  opacity: 0;
+}
+
 /* Pill-style switch for view */
 .pill-switch {
   display: flex;
